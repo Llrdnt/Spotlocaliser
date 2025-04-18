@@ -68,7 +68,7 @@ if 'position' not in st.session_state:
 centre_carte = [50.670, 4.615]
 m = folium.Map(location=centre_carte, zoom_start=13)
 folium.plugins.LocateControl(auto_start=True).add_to(m)
-map_data = st_folium(m, height=300, width=600)
+map_data = st_folium(m, height=2, width=2)
 
 # Détection automatique de la position via le centre de la carte
 if map_data and 'center' in map_data and map_data['center']:
