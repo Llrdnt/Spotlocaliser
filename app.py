@@ -12,8 +12,8 @@ points_cibles = [
     {"nom": "Spot 2", "coords": (50.68141372627077, 4.264321702154752)},
     {"nom": "Spot 3", "coords": (50.68280545646507, 4.269052508141664)},
     {"nom": "Spot 4", "coords": (50.68180044491118, 4.258132598179554)},
-    {"nom": "PlaceUNifTEST", "coords": (50.66982006099279, 4.615156809327821)},
-    {"nom": "CinéscopeTEST", "coords": (50.66894905762168, 4.611584693290536)},
+    {"nom": "PlaceUNifTEST",     "coords": (50.66982006099279, 4.615156809327821)},
+    {"nom": "CinéscopeTEST",     "coords": (50.66894905762168, 4.611584693290536)},
 ]
 
 # UI STYLES
@@ -28,18 +28,20 @@ st.markdown("""
 
 st.markdown('<div class="title">🧭 Détecteur de balises cachées</div>', unsafe_allow_html=True)
 
-# Bouton manuel de rafraîchissement
-if st.button("📍 Recharger ma position"):
+# === Bouton manuel de rafraîchissement via callback ===
+def _reload():
     st.experimental_rerun()
 
-# Auto-refresh chaque 10 sec
+st.button("📍 Recharger ma position", on_click=_reload)
+
+# === Auto-refresh toutes les 10 secondes (JS) ===
 st.markdown("""
 <script>
     setTimeout(() => { window.location.reload(); }, 10000);
 </script>
 """, unsafe_allow_html=True)
 
-# === Localisation GPS via streamlit_js_eval ===
+# === Localisation GPS ===
 coords = streamlit_js_eval(
     js_expressions="""
       navigator.geolocation.getCurrentPosition(
@@ -58,7 +60,7 @@ coords = streamlit_js_eval(
     want_output=True
 )
 
-# === Traitement ===
+# === Traitement des coordonnées ===
 if isinstance(coords, dict) and "latitude" in coords and "longitude" in coords:
     lat, lon = coords["latitude"], coords["longitude"]
     user_loc = (lat, lon)
@@ -73,7 +75,7 @@ if isinstance(coords, dict) and "latitude" in coords and "longitude" in coords:
         <div class="box">
             <div class="info">
                 📍 Position détectée<br><br>
-                Distance de <b>{nom_zone}</b> : <b>{int(distance_m)} mètres</b>
+                Distance de <b>{nom_zone}</b> : <b>{int(distance_m)} m</b>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -94,7 +96,6 @@ if isinstance(coords, dict) and "latitude" in coords and "longitude" in coords:
         }}, {int(freq * 1000)});
         </script>
         """, unsafe_allow_html=True)
-
     else:
         st.warning("🔕 Aucun signal détecté dans cette zone…")
 
