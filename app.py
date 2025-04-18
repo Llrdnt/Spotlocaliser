@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_js_eval import get_geolocation
+from streamlit_js_eval import streamlit_js_eval
 from geopy.distance import geodesic
 
 # CONFIG
@@ -19,61 +19,55 @@ points_cibles = [
 # UI STYLES
 st.markdown("""
     <style>
-    .title {
-        font-size: 2em;
-        text-align: center;
-        margin-top: 1em;
-        font-weight: bold;
-        color: #2b4a2d;
-    }
-    .box {
-        background-color: #e5f5e0;
-        padding: 1em;
-        border-radius: 10px;
-        margin-top: 1em;
-        text-align: center;
-        box-shadow: 0px 0px 10px #ccc;
-    }
-    .info {
-        font-size: 1.2em;
-        margin-top: 1em;
-    }
+    .title { font-size: 2em; text-align: center; margin-top: 1em; font-weight: bold; color: #2b4a2d; }
+    .box   { background-color: #e5f5e0; padding: 1em; border-radius: 10px; margin-top: 1em;
+             text-align: center; box-shadow: 0px 0px 10px #ccc; }
+    .info  { font-size: 1.2em; margin-top: 1em; }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="title">🧭 Détecteur de balises cachées</div>', unsafe_allow_html=True)
 
-# === Bouton manuel de mise à jour ===
+# Bouton manuel de rafraîchissement
 if st.button("📍 Recharger ma position"):
-    st.markdown("""
-    <script>
-        window.location.reload();
-    </script>
-    """, unsafe_allow_html=True)
+    st.experimental_rerun()
 
-# === Auto-refresh toutes les 10 secondes ===
+# Auto-refresh chaque 10 sec
 st.markdown("""
 <script>
-    setTimeout(() => {
-        window.location.reload();
-    }, 10000);
+    setTimeout(() => { window.location.reload(); }, 10000);
 </script>
 """, unsafe_allow_html=True)
 
-# === Localisation GPS via le helper get_geolocation() ===
-loc = get_geolocation()
+# === Localisation GPS via streamlit_js_eval ===
+coords = streamlit_js_eval(
+    js_expressions="""
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          Streamlit.setComponentValue({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          })
+        },
+        err => {
+          Streamlit.setComponentValue({ error: err.message })
+        }
+      );
+    """,
+    key="get_position",
+    want_output=True
+)
 
-# === Traitement des coordonnées ===
-if loc and isinstance(loc, dict):
-    lat, lon = loc["latitude"], loc["longitude"]
+# === Traitement ===
+if isinstance(coords, dict) and "latitude" in coords and "longitude" in coords:
+    lat, lon = coords["latitude"], coords["longitude"]
     user_loc = (lat, lon)
 
     distances = [
-        (pt["nom"], geodesic(user_loc, pt["coords"]).meters, pt["coords"])
+        (pt["nom"], geodesic(user_loc, pt["coords"]).meters)
         for pt in points_cibles
     ]
-
-    nom_zone, distance_m, _ = min(distances, key=lambda x: x[1])
+    nom_zone, distance_m = min(distances, key=lambda x: x[1])
 
     st.markdown(f"""
         <div class="box">
@@ -85,11 +79,8 @@ if loc and isinstance(loc, dict):
     """, unsafe_allow_html=True)
 
     if distance_m <= CIBLE_RADIUS_METERS:
-        # fréquence du bip en fonction de la distance
         freq = max(0.3, 3 * (1 - distance_m / CIBLE_RADIUS_METERS))
-
         st.success(f"📡 Signal capté à {int(distance_m)} m ! Le radar s'affole...")
-
         st.markdown(f"""
         <audio id="bip" autoplay loop>
             <source src="https://www.soundjay.com/button/beep-07.wav" type="audio/wav">
@@ -103,8 +94,12 @@ if loc and isinstance(loc, dict):
         }}, {int(freq * 1000)});
         </script>
         """, unsafe_allow_html=True)
+
     else:
         st.warning("🔕 Aucun signal détecté dans cette zone…")
+
+elif isinstance(coords, dict) and "error" in coords:
+    st.error(f"📡 Erreur géoloc : {coords['error']}")
 
 else:
     st.info("📍 En attente de localisation GPS…")
