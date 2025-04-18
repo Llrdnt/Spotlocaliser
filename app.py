@@ -1,6 +1,6 @@
 import streamlit as st
-from streamlit_js_eval import streamlit_js_eval
 from geopy.distance import geodesic
+import json
 
 # CONFIG
 st.set_page_config(page_title="Détecteur Scout", layout="centered")
@@ -23,85 +23,174 @@ st.markdown("""
     .box   { background-color: #e5f5e0; padding: 1em; border-radius: 10px; margin-top: 1em;
              text-align: center; box-shadow: 0px 0px 10px #ccc; }
     .info  { font-size: 1.2em; margin-top: 1em; }
+    #location_display { margin: 20px 0; padding: 10px; background-color: #f0f9ff; border-radius: 5px; }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="title">🧭 Détecteur de balises cachées</div>', unsafe_allow_html=True)
 
-# === Bouton manuel de rafraîchissement (JS) ===
-if st.button("📍 Recharger ma position"):
-    st.markdown(
-        """<script>window.location.reload();</script>""",
-        unsafe_allow_html=True
-    )
-
-# === Auto-refresh toutes les 10 secondes ===
+# Injecter le JavaScript pour la géolocalisation directement
 st.markdown("""
+<div id="location_display">Attente de localisation...</div>
+
 <script>
-    setTimeout(() => { window.location.reload(); }, 10000);
+// Fonction pour mettre à jour la localisation et rafraîchir
+function updateLocation() {
+    const locationDisplay = document.getElementById('location_display');
+    locationDisplay.innerHTML = "Demande de géolocalisation...";
+    
+    if (!navigator.geolocation) {
+        locationDisplay.innerHTML = "La géolocalisation n'est pas supportée par votre navigateur.";
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            
+            // Créer un élément caché pour stocker les coordonnées
+            let hiddenInput = document.getElementById('geolocation_data');
+            if (!hiddenInput) {
+                hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.id = 'geolocation_data';
+                document.body.appendChild(hiddenInput);
+            }
+            
+            // Stocker les coordonnées
+            hiddenInput.value = JSON.stringify({
+                latitude: lat,
+                longitude: lon,
+                accuracy: position.coords.accuracy
+            });
+            
+            // Rediriger avec les coordonnées en paramètres
+            window.location.href = `?lat=${lat}&lon=${lon}&acc=${position.coords.accuracy}`;
+        },
+        function(error) {
+            let errorMsg;
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = "Accès à la géolocalisation refusé.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = "Localisation indisponible.";
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = "Délai de localisation expiré.";
+                    break;
+                default:
+                    errorMsg = "Erreur inconnue de géolocalisation.";
+            }
+            locationDisplay.innerHTML = `Erreur: ${errorMsg}`;
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
+
+// Démarrer la géolocalisation dès le chargement
+updateLocation();
+
+// Rafraîchir périodiquement
+setInterval(updateLocation, 15000);
 </script>
 """, unsafe_allow_html=True)
 
-# === Localisation GPS via streamlit_js_eval ===
-coords = streamlit_js_eval(
-    js_expressions="""
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          Streamlit.setComponentValue({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude
-          })
-        },
-        err => {
-          Streamlit.setComponentValue({ error: err.message })
-        }
-      );
-    """,
-    key="get_position",
-    want_output=True
-)
+# Récupérer les paramètres d'URL avec la nouvelle méthode recommandée
+params = st.query_params
+lat = params.get("lat", [""])[0] if "lat" in params else ""
+lon = params.get("lon", [""])[0] if "lon" in params else ""
+acc = params.get("acc", [""])[0] if "acc" in params else ""
 
-# === Traitement des coordonnées ===
-if isinstance(coords, dict) and "latitude" in coords and "longitude" in coords:
-    lat, lon = coords["latitude"], coords["longitude"]
-    user_loc = (lat, lon)
-
-    distances = [
-        (pt["nom"], geodesic(user_loc, pt["coords"]).meters)
-        for pt in points_cibles
-    ]
-    nom_zone, distance_m = min(distances, key=lambda x: x[1])
-
-    st.markdown(f"""
-        <div class="box">
-            <div class="info">
-                📍 Position détectée<br><br>
-                Distance de <b>{nom_zone}</b> : <b>{int(distance_m)} m</b>
-            </div>
-        </div>
+# Bouton de rafraîchissement manuel
+if st.button("📍 Actualiser ma position", key="reload_btn"):
+    st.markdown("""
+    <script>
+        updateLocation();
+    </script>
     """, unsafe_allow_html=True)
+    st.rerun()
 
-    if distance_m <= CIBLE_RADIUS_METERS:
-        freq = max(0.3, 3 * (1 - distance_m / CIBLE_RADIUS_METERS))
-        st.success(f"📡 Signal capté à {int(distance_m)} m ! Le radar s'affole...")
+# Traitement des coordonnées si disponibles
+if lat and lon and lat != "" and lon != "":
+    try:
+        lat = float(lat)
+        lon = float(lon)
+        user_loc = (lat, lon)
+        
+        # Calcul des distances
+        distances = [
+            (pt["nom"], geodesic(user_loc, pt["coords"]).meters)
+            for pt in points_cibles
+        ]
+        nom_zone, distance_m = min(distances, key=lambda x: x[1])
+
         st.markdown(f"""
-        <audio id="bip" autoplay loop>
-            <source src="https://www.soundjay.com/button/beep-07.wav" type="audio/wav">
-        </audio>
-        <script>
-        const bip = document.getElementById("bip");
-        setInterval(() => {{
-            bip.pause();
-            bip.currentTime = 0;
-            bip.play();
-        }}, {int(freq * 1000)});
-        </script>
+            <div class="box">
+                <div class="info">
+                    📍 Position détectée<br><br>
+                    Distance de <b>{nom_zone}</b> : <b>{int(distance_m)} m</b>
+                </div>
+            </div>
         """, unsafe_allow_html=True)
-    else:
-        st.warning("🔕 Aucun signal détecté dans cette zone…")
 
-elif isinstance(coords, dict) and "error" in coords:
-    st.error(f"📡 Erreur géoloc : {coords['error']}")
+        if distance_m <= CIBLE_RADIUS_METERS:
+            freq = max(0.3, 3 * (1 - distance_m / CIBLE_RADIUS_METERS))
+            st.success(f"📡 Signal capté à {int(distance_m)} m ! Le radar s'affole...")
+            st.markdown(f"""
+            <audio id="bip" autoplay loop>
+                <source src="https://www.soundjay.com/button/beep-07.wav" type="audio/wav">
+            </audio>
+            <script>
+            const bip = document.getElementById("bip");
+            setInterval(() => {{
+                bip.pause();
+                bip.currentTime = 0;
+                bip.play();
+            }}, {int(freq * 1000)});
+            </script>
+            """, unsafe_allow_html=True)
+        else:
+            st.warning("🔕 Aucun signal détecté dans cette zone…")
+        
+        # Afficher les coordonnées en mode debug
+        with st.expander("Détails techniques"):
+            st.write(f"Latitude: {lat}")
+            st.write(f"Longitude: {lon}")
+            if acc:
+                st.write(f"Précision: ±{acc} mètres")
 
+    except Exception as e:
+        st.error(f"Erreur lors du traitement des coordonnées: {e}")
 else:
-    st.info("📍 En attente de localisation GPS…")
+    st.info("En attente de localisation... Si rien ne se passe, vérifiez les autorisations de votre navigateur.")
+    
+    # Instructions pour l'utilisateur
+    with st.expander("Aide - Comment autoriser la géolocalisation"):
+        st.markdown("""
+        ### Comment autoriser la géolocalisation
+        
+        #### Sur Chrome/Edge:
+        1. Cliquez sur l'icône du cadenas à gauche de l'URL dans la barre d'adresse
+        2. Dans les paramètres du site, assurez-vous que "Localisation" est réglée sur "Autoriser"
+        
+        #### Sur Firefox:
+        1. Cliquez sur l'icône du cadenas à gauche de l'URL
+        2. Cliquez sur "Autorisations du site"
+        3. Assurez-vous que "Accéder à votre localisation" est autorisé
+        
+        #### Sur Safari:
+        1. Allez dans Préférences > Sites web > Localisation
+        2. Autorisez ce site
+        
+        #### Sur mobile:
+        1. Assurez-vous que la localisation est activée dans les paramètres de votre appareil
+        2. Autorisez le navigateur à accéder à votre localisation
+        
+        **Important**: Cette application nécessite HTTPS pour fonctionner.
+        """)
