@@ -4,6 +4,7 @@ from streamlit_folium import folium_static, st_folium
 from geopy.distance import geodesic
 import time
 import requests
+from io import BytesIO
 
 # CONFIG
 st.set_page_config(page_title="Détecteur Scout", layout="centered")
@@ -15,7 +16,7 @@ points_cibles = [
     {"nom": "Spot 2", "coords": (50.68141372627077, 4.264321702154752)},
     {"nom": "Spot 3", "coords": (50.68280545646507, 4.269052508141664)},
     {"nom": "Spot 4", "coords": (50.68180044491118, 4.258132598179554)},
-    {"nom": "Test", "coords": (50.666145486863286,4.278810154822357)},
+    {"nom": "Spot tes", "coords": (50.665927850951, 4.278714137282)},
     {"nom": "PlaceUNifTEST", "coords": (50.66982006099279, 4.615156809327821)},
     {"nom": "CinéscopeTEST", "coords": (50.66894905762168, 4.611584693290536)},
 ]
@@ -42,18 +43,19 @@ if 'position' not in st.session_state:
 if 'gps_active' not in st.session_state:
     st.session_state.gps_active = False
 
-# Centre approximatif pour démarrer
+# Centre approximatif pour démarrer (si pas de position)
 centre_carte = [50.670, 4.615]
 
 # Rafraîchissement automatique
 if time.time() - st.session_state.last_update > 30:
     st.session_state.last_update = time.time()
+    st.session_state['bip_played'] = False
     st.rerun()
 
 # Créer la carte
 m = folium.Map(location=centre_carte, zoom_start=13)
 
-# Ajouter les contrôles
+# Ajouter les outils de localisation
 folium.LatLngPopup().add_to(m)
 folium.plugins.LocateControl(
     auto_start=True,
@@ -62,13 +64,11 @@ folium.plugins.LocateControl(
     strings={"title": "Ma position", "popup": "Vous êtes ici"}
 ).add_to(m)
 
-# Récupérer données de la carte
+# Afficher la carte
 map_data = st_folium(m, height=300, width=600)
-st.write("Map data debug:", map_data)
 
-# Récupérer la position automatiquement via le centre de la carte (LocateControl auto_start)
+# Récupérer la position automatiquement via le centre de la carte ou clic
 user_position = None
-
 if map_data:
     if map_data.get('last_clicked'):
         user_position = [
@@ -85,15 +85,7 @@ if user_position:
     st.session_state.position = user_position
     st.session_state.gps_active = True
 
-
-# Détection automatique de position
-user_position = None
-if map_data and 'location' in map_data and map_data['location']:
-    user_position = [map_data['location']['lat'], map_data['location']['lng']]
-    st.session_state.position = user_position
-    st.session_state.gps_active = True
-
-# Erreur si GPS demandé mais non dispo
+# Si pas de GPS
 if st.session_state.gps_active and not st.session_state.position:
     st.markdown("""
         <div class="no-gps">
@@ -104,49 +96,40 @@ if st.session_state.gps_active and not st.session_state.position:
         </div>
     """, unsafe_allow_html=True)
 
-# Si position dispo
+# Détection du signal
 if st.session_state.position:
     user_lat, user_lon = st.session_state.position
     user_loc = (user_lat, user_lon)
-    with st.expander("Distances à tous les spots"):
-        for pt in points_cibles:
-            dist = geodesic(user_loc, pt["coords"]).meters
-            st.write(f"{pt['nom']}: {int(dist)} m")
 
-    # Reset bip à chaque rafraîchissement
-    st.session_state['bip_played'] = False
-
-    # Calcul des distances
     distances = [
         (pt["nom"], geodesic(user_loc, pt["coords"]).meters)
         for pt in points_cibles
     ]
     nom_zone, distance_m = min(distances, key=lambda x: x[1])
 
+    st.session_state['bip_played'] = False
+
     if distance_m <= CIBLE_RADIUS_METERS:
-        freq = max(0.2, 2 * (distance_m / CIBLE_RADIUS_METERS))
-        
-        # Affichage infos
-st.markdown(f"""
-    <div class="box">
-        <div class="info">
-            📍 Position détectée<br><br>
-            <b>Signal détecté!</b> Vous êtes à <b>{int(distance_m)} m</b> de <b>{nom_zone}</b>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+        st.markdown(f"""
+            <div class="box">
+                <div class="info">
+                    📍 Position détectée<br><br>
+                    <b>Signal détecté!</b> Vous êtes à <b>{int(distance_m)} m</b> de <b>{nom_zone}</b>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-st.success(f"📡 Signal capté ! Le radar s'affole...")
+        st.success(f"📱 Signal capté ! Le radar s'affole...")
 
-# Charger et jouer le bip (via Streamlit)
-if 'bip_played' not in st.session_state or not st.session_state['bip_played']:
-    try:
-        audio_url = "https://www.soundjay.com/button/beep-07.wav"
-        audio_data = requests.get(audio_url).content
-        st.audio(audio_data, format='audio/wav')
-        st.session_state['bip_played'] = True
-    except Exception as e:
-        st.error("Erreur audio : " + str(e))
+        if 'bip_played' not in st.session_state or not st.session_state['bip_played']:
+            try:
+                audio_url = "https://www.soundjay.com/button/beep-07.wav"
+                response = requests.get(audio_url)
+                audio_bytes = BytesIO(response.content)
+                st.audio(audio_bytes, format='audio/wav')
+                st.session_state['bip_played'] = True
+            except Exception as e:
+                st.error(f"Erreur audio : {e}")
 
     else:
         st.markdown(f"""
@@ -157,9 +140,10 @@ if 'bip_played' not in st.session_state or not st.session_state['bip_played']:
                 </div>
             </div>
         """, unsafe_allow_html=True)
-        
+
         st.warning("🔕 Vous n'êtes à proximité d'aucun spot. Continuez d'explorer!")
 
+    # Affichage debug
     with st.expander("Détails techniques"):
         st.write(f"Latitude: {user_lat}")
         st.write(f"Longitude: {user_lon}")
@@ -169,11 +153,12 @@ if 'bip_played' not in st.session_state or not st.session_state['bip_played']:
 else:
     st.info("""
     **Instructions:**
-    - Donnez l'autorisation de localisation à votre navigateur.
-    - Approchez-vous d'un des spots pour déclencher le signal.
+    1. Activez la localisation sur votre téléphone ou navigateur
+    2. Approchez-vous d'un spot pour entendre le signal sonore
+    3. Le son est rejoué à chaque rafraîchissement si vous êtes dans une zone valide
     """)
 
-# Liste des spots
+# Liste admin des spots
 with st.expander("Voir tous les spots (Admin)"):
     st.markdown("### Liste des spots à découvrir")
     for i, spot in enumerate(points_cibles):
