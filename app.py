@@ -3,6 +3,7 @@ import folium
 from streamlit_folium import folium_static, st_folium
 from geopy.distance import geodesic
 import time
+import requests
 
 # CONFIG
 st.set_page_config(page_title="Détecteur Scout", layout="centered")
