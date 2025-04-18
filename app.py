@@ -12,8 +12,8 @@ points_cibles = [
     {"nom": "Spot 2", "coords": (50.68141372627077, 4.264321702154752)},
     {"nom": "Spot 3", "coords": (50.68280545646507, 4.269052508141664)},
     {"nom": "Spot 4", "coords": (50.68180044491118, 4.258132598179554)},
-    {"nom": "PlaceUNifTEST",     "coords": (50.66982006099279, 4.615156809327821)},
-    {"nom": "CinéscopeTEST",     "coords": (50.66894905762168, 4.611584693290536)},
+    {"nom": "PlaceUNifTEST", "coords": (50.66982006099279, 4.615156809327821)},
+    {"nom": "CinéscopeTEST", "coords": (50.66894905762168, 4.611584693290536)},
 ]
 
 # UI STYLES
@@ -28,20 +28,21 @@ st.markdown("""
 
 st.markdown('<div class="title">🧭 Détecteur de balises cachées</div>', unsafe_allow_html=True)
 
-# === Bouton manuel de rafraîchissement via callback ===
-def _reload():
-    st.experimental_rerun()
+# === Bouton manuel de rafraîchissement (JS) ===
+if st.button("📍 Recharger ma position"):
+    st.markdown(
+        """<script>window.location.reload();</script>""",
+        unsafe_allow_html=True
+    )
 
-st.button("📍 Recharger ma position", on_click=_reload)
-
-# === Auto-refresh toutes les 10 secondes (JS) ===
+# === Auto-refresh toutes les 10 secondes ===
 st.markdown("""
 <script>
     setTimeout(() => { window.location.reload(); }, 10000);
 </script>
 """, unsafe_allow_html=True)
 
-# === Localisation GPS ===
+# === Localisation GPS via streamlit_js_eval ===
 coords = streamlit_js_eval(
     js_expressions="""
       navigator.geolocation.getCurrentPosition(
