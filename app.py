@@ -112,6 +112,8 @@ if st.session_state.position:
             dist = geodesic(user_loc, pt["coords"]).meters
             st.write(f"{pt['nom']}: {int(dist)} m")
 
+    # Reset bip à chaque rafraîchissement
+    st.session_state['bip_played'] = False
 
     # Calcul des distances
     distances = [
@@ -123,44 +125,27 @@ if st.session_state.position:
     if distance_m <= CIBLE_RADIUS_METERS:
         freq = max(0.2, 2 * (distance_m / CIBLE_RADIUS_METERS))
         
-        st.markdown(f"""
-            <div class="box">
-                <div class="info">
-                    📍 Position détectée<br><br>
-                    <b>Signal détecté!</b> Vous êtes à <b>{int(distance_m)} m</b> de <b>{nom_zone}</b>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.success("📡 Signal capté ! Le radar s'affole...")
+        # Affichage infos
+st.markdown(f"""
+    <div class="box">
+        <div class="info">
+            📍 Position détectée<br><br>
+            <b>Signal détecté!</b> Vous êtes à <b>{int(distance_m)} m</b> de <b>{nom_zone}</b>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
-        # BIP SONORE OPTIMISÉ
-        st.markdown(f"""
-        <audio id="radar_beep" preload="auto">
-            <source src="https://www.soundjay.com/button/beep-07.wav" type="audio/wav">
-        </audio>
-        <script>
-        let beepInterval = null;
-        const radar = document.getElementById("radar_beep");
+st.success(f"📡 Signal capté ! Le radar s'affole...")
 
-        function playBeep() {{
-            radar.pause();
-            radar.currentTime = 0;
-            radar.play().catch(e => console.error("Erreur de lecture audio:", e));
-        }}
-
-        function startBeeping(freq) {{
-            if (beepInterval) clearInterval(beepInterval);
-            beepInterval = setInterval(playBeep, freq);
-        }}
-
-        startBeeping({int(freq * 1000)});
-
-        document.body.addEventListener('click', () => {{
-            playBeep();
-        }}, {{ once: true }});
-        </script>
-        """, unsafe_allow_html=True)
+# Charger et jouer le bip (via Streamlit)
+if 'bip_played' not in st.session_state or not st.session_state['bip_played']:
+    try:
+        audio_url = "https://www.soundjay.com/button/beep-07.wav"
+        audio_data = requests.get(audio_url).content
+        st.audio(audio_data, format='audio/wav')
+        st.session_state['bip_played'] = True
+    except Exception as e:
+        st.error("Erreur audio : " + str(e))
 
     else:
         st.markdown(f"""
