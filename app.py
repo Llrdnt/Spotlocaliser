@@ -63,6 +63,27 @@ folium.plugins.LocateControl(
 
 # Récupérer données de la carte
 map_data = st_folium(m, height=300, width=600)
+st.write("Map data debug:", map_data)
+
+# Récupérer la position automatiquement via le centre de la carte (LocateControl auto_start)
+user_position = None
+
+if map_data:
+    if map_data.get('last_clicked'):
+        user_position = [
+            map_data['last_clicked']['lat'],
+            map_data['last_clicked']['lng']
+        ]
+    elif map_data.get('center'):
+        user_position = [
+            map_data['center']['lat'],
+            map_data['center']['lng']
+        ]
+
+if user_position:
+    st.session_state.position = user_position
+    st.session_state.gps_active = True
+
 
 # Détection automatique de position
 user_position = None
@@ -86,6 +107,11 @@ if st.session_state.gps_active and not st.session_state.position:
 if st.session_state.position:
     user_lat, user_lon = st.session_state.position
     user_loc = (user_lat, user_lon)
+    with st.expander("Distances à tous les spots"):
+        for pt in points_cibles:
+            dist = geodesic(user_loc, pt["coords"]).meters
+            st.write(f"{pt['nom']}: {int(dist)} m")
+
 
     # Calcul des distances
     distances = [
