@@ -1,3 +1,7 @@
+opencv-python
+numpy
+Pillow
 streamlit
-streamlit-js-eval
+folium
+streamlit-folium
 geopy

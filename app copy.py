@@ -32,19 +32,10 @@ st.markdown("""
     .box   { background-color: #e5f5e0; padding: 1em; border-radius: 10px; margin-top: 1em;
              text-align: center; box-shadow: 0px 0px 10px #ccc; }
     .info  { font-size: 1.2em; margin-top: 1em; }
-    .spot-list { margin: 1em 0; }
-    .spot-item { background-color: #f0f9e8; padding: 0.7em; border-radius: 5px; margin-bottom: 0.5em; }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="title">🧭 Détecteur de balises cachées</div>', unsafe_allow_html=True)
-
-# Afficher les informations sur les spots avant la carte
-st.markdown('<div class="spot-list">', unsafe_allow_html=True)
-st.markdown("### Liste des spots à découvrir")
-for i, spot in enumerate(points_cibles):
-    st.markdown(f'<div class="spot-item">📌 <b>{spot["nom"]}</b></div>', unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
 
 # Initialiser la session state
 if 'last_update' not in st.session_state:
@@ -104,72 +95,42 @@ if st.session_state.position:
     ]
     nom_zone, distance_m = min(distances, key=lambda x: x[1])
 
-    # N'afficher la distance que si l'utilisateur est dans le rayon de détection
-    if distance_m <= CIBLE_RADIUS_METERS:
-        # Calculer la fréquence du bip: plus proche = plus rapide
-        # Fréquence varie de 0.2s (très proche) à 2s (à la limite du rayon)
-        freq = max(0.2, 2 * (distance_m / CIBLE_RADIUS_METERS))
-        
-        st.markdown(f"""
-            <div class="box">
-                <div class="info">
-                    📍 Position détectée<br><br>
-                    <b>Signal détecté!</b> Vous êtes à <b>{int(distance_m)} m</b> de <b>{nom_zone}</b>
-                </div>
+    st.markdown(f"""
+        <div class="box">
+            <div class="info">
+                📍 Position détectée<br><br>
+                Distance de <b>{nom_zone}</b> : <b>{int(distance_m)} m</b>
             </div>
-        """, unsafe_allow_html=True)
-        
-        st.success(f"📡 Signal capté ! Le radar s'affole...")
-        
-        # Son de radar qui s'accélère plus on s'approche
+        </div>
+    """, unsafe_allow_html=True)
+
+    if distance_m <= CIBLE_RADIUS_METERS:
+        freq = max(0.3, 3 * (1 - distance_m / CIBLE_RADIUS_METERS))
+        st.success(f"📡 Signal capté à {int(distance_m)} m ! Le radar s'affole...")
         st.markdown(f"""
-        <audio id="radar_beep" autoplay loop>
+        <audio id="bip" autoplay loop>
             <source src="https://www.soundjay.com/button/beep-07.wav" type="audio/wav">
         </audio>
         <script>
-        const radar = document.getElementById("radar_beep");
-        let isPlaying = false;
-        
-        function playRadarSound() {{
-            radar.pause();
-            radar.currentTime = 0;
-            radar.play();
-            isPlaying = true;
-            setTimeout(() => {{
-                isPlaying = false;
-            }}, 100);
-        }}
-        
+        const bip = document.getElementById("bip");
         setInterval(() => {{
-            if (!isPlaying) {{
-                playRadarSound();
-            }}
+            bip.pause();
+            bip.currentTime = 0;
+            bip.play();
         }}, {int(freq * 1000)});
         </script>
         """, unsafe_allow_html=True)
     else:
-        st.markdown(f"""
-            <div class="box">
-                <div class="info">
-                    📍 Position détectée<br><br>
-                    🔕 Aucun signal détecté dans cette zone...
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.warning("🔕 Vous n'êtes à proximité d'aucun spot. Continuez d'explorer!")
+        st.warning("🔕 Aucun signal détecté dans cette zone…")
     
     # Afficher les coordonnées en mode debug
     with st.expander("Détails techniques"):
         st.write(f"Latitude: {user_lat}")
         st.write(f"Longitude: {user_lon}")
-        st.write(f"Spot le plus proche: {nom_zone}")
-        st.write(f"Distance: {int(distance_m)} mètres")
 
 else:
     st.info("""
     **Instructions:**
     1. Cliquez sur le bouton de localisation 🔍 dans la carte pour trouver votre position
     2. Ou cliquez sur la carte pour sélectionner un emplacement manuellement
-    3. Lorsque vous êtes à moins de 500m d'un spot, un signal sonore vous guidera!
     """)
