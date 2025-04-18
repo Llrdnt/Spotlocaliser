@@ -1,10 +1,8 @@
 import streamlit as st
-import folium
-from streamlit_folium import folium_static, st_folium
 from geopy.distance import geodesic
+from streamlit_folium import st_folium
+import folium
 import time
-import requests
-from io import BytesIO
 
 # CONFIG
 st.set_page_config(page_title="Détecteur Scout", layout="centered")
@@ -12,154 +10,91 @@ CIBLE_RADIUS_METERS = 500
 
 # ZONES CIBLES GPS
 points_cibles = [
-    {"nom": "Spot 1", "coords": (50.68704115862972, 4.260554416777018)},
-    {"nom": "Spot 2", "coords": (50.68141372627077, 4.264321702154752)},
-    {"nom": "Spot 3", "coords": (50.68280545646507, 4.269052508141664)},
-    {"nom": "Spot 4", "coords": (50.68180044491118, 4.258132598179554)},
-    {"nom": "Spot tes", "coords": (50.665927850951, 4.278714137282)},
-    {"nom": "PlaceUNifTEST", "coords": (50.66982006099279, 4.615156809327821)},
-    {"nom": "CinéscopeTEST", "coords": (50.66894905762168, 4.611584693290536)},
+    {"nom": "Bonus 1", "coords": (50.68704115862972, 4.260554416777018)},
+    {"nom": "Bonus 2", "coords": (50.68141372627077, 4.264321702154752)},
+    {"nom": "Bonus 3", "coords": (50.68280545646507, 4.269052508141664)},
 ]
 
-# UI STYLES
+# STYLES
 st.markdown("""
     <style>
-    .title { font-size: 2em; text-align: center; margin-top: 1em; font-weight: bold; color: #2b4a2d; }
-    .box   { background-color: #e5f5e0; padding: 1em; border-radius: 10px; margin-top: 1em;
-             text-align: center; box-shadow: 0px 0px 10px #ccc; }
-    .info  { font-size: 1.2em; margin-top: 1em; }
-    .no-gps { background-color: #f8d7da; padding: 1em; border-radius: 10px; margin-top: 1em;
-              text-align: center; box-shadow: 0px 0px 10px #ccc; color: #721c24; }
+    body {
+        background-color: #f9fdfc;
+    }
+    .title {
+        font-size: 2.5em;
+        text-align: center;
+        margin-top: 1em;
+        font-weight: bold;
+        color: #1b4332;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .box {
+        background-color: #d8f3dc;
+        padding: 1.5em;
+        border-radius: 15px;
+        margin-top: 1em;
+        text-align: center;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        font-size: 1.1em;
+    }
+    .spot-box {
+        background: linear-gradient(135deg, #ffffff 0%, #e9f5ee 100%);
+        border-left: 6px solid #52b788;
+        border-radius: 10px;
+        padding: 1em;
+        margin: 1em 0;
+        box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.05);
+    }
+    .spot-box b {
+        font-size: 1.2em;
+        color: #081c15;
+    }
+    .distance {
+        font-weight: bold;
+        font-size: 1.1em;
+        color: #40916c;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="title">🧭 Détecteur de balises cachées</div>', unsafe_allow_html=True)
+st.markdown('<div class="title">📍 Répertoire des Spots</div>', unsafe_allow_html=True)
 
 # Initialiser la session state
-if 'last_update' not in st.session_state:
-    st.session_state.last_update = time.time()
 if 'position' not in st.session_state:
     st.session_state.position = None
-if 'gps_active' not in st.session_state:
-    st.session_state.gps_active = False
 
-# Centre approximatif pour démarrer (si pas de position)
+# Carte avec folium (centrée arbitrairement)
 centre_carte = [50.670, 4.615]
-
-# Rafraîchissement automatique
-if time.time() - st.session_state.last_update > 30:
-    st.session_state.last_update = time.time()
-    st.session_state['bip_played'] = False
-    st.rerun()
-
-# Créer la carte
 m = folium.Map(location=centre_carte, zoom_start=13)
-
-# Ajouter les outils de localisation
-folium.LatLngPopup().add_to(m)
-folium.plugins.LocateControl(
-    auto_start=True,
-    flyTo=True,
-    keepCurrentZoomLevel=True,
-    strings={"title": "Ma position", "popup": "Vous êtes ici"}
-).add_to(m)
-
-# Afficher la carte
+folium.plugins.LocateControl(auto_start=True).add_to(m)
 map_data = st_folium(m, height=300, width=600)
 
-# Récupérer la position automatiquement via le centre de la carte ou clic
-user_position = None
-if map_data:
-    if map_data.get('last_clicked'):
-        user_position = [
-            map_data['last_clicked']['lat'],
-            map_data['last_clicked']['lng']
-        ]
-    elif map_data.get('center'):
-        user_position = [
-            map_data['center']['lat'],
-            map_data['center']['lng']
-        ]
+# Détection automatique de la position via le centre de la carte
+if map_data and 'center' in map_data and map_data['center']:
+    lat = map_data['center']['lat']
+    lon = map_data['center']['lng']
+    st.session_state.position = (lat, lon)
 
-if user_position:
-    st.session_state.position = user_position
-    st.session_state.gps_active = True
-
-# Si pas de GPS
-if st.session_state.gps_active and not st.session_state.position:
-    st.markdown("""
-        <div class="no-gps">
-            <div class="info">
-                ⚠️ <b>Aucun signal GPS détecté</b> ⚠️<br><br>
-                Vérifiez que la localisation est activée sur votre appareil
-            </div>
+# Affichage principal
+if st.session_state.position:
+    user_loc = st.session_state.position
+    st.markdown(f"""
+        <div class=\"box\">
+            ✅ Position actuelle détectée<br>
+            <b>Latitude:</b> {user_loc[0]:.6f}, <b>Longitude:</b> {user_loc[1]:.6f}
         </div>
     """, unsafe_allow_html=True)
 
-# Détection du signal
-if st.session_state.position:
-    user_lat, user_lon = st.session_state.position
-    user_loc = (user_lat, user_lon)
+    st.markdown("<h3 style='margin-top:2em; color: #1b4332;'>🗺️ Distances jusqu'aux spots :</h3>", unsafe_allow_html=True)
 
-    distances = [
-        (pt["nom"], geodesic(user_loc, pt["coords"]).meters)
-        for pt in points_cibles
-    ]
-    nom_zone, distance_m = min(distances, key=lambda x: x[1])
-
-    st.session_state['bip_played'] = False
-
-    if distance_m <= CIBLE_RADIUS_METERS:
+    for spot in points_cibles:
+        distance = geodesic(user_loc, spot["coords"]).meters
         st.markdown(f"""
-            <div class="box">
-                <div class="info">
-                    📍 Position détectée<br><br>
-                    <b>Signal détecté!</b> Vous êtes à <b>{int(distance_m)} m</b> de <b>{nom_zone}</b>
-                </div>
+            <div class=\"spot-box\">
+                <b>{spot['nom']}</b><br>
+                Distance: <span class='distance'>{int(distance)} m</span>
             </div>
         """, unsafe_allow_html=True)
-
-        st.success(f"📱 Signal capté ! Le radar s'affole...")
-
-        if 'bip_played' not in st.session_state or not st.session_state['bip_played']:
-            try:
-                audio_url = "https://www.soundjay.com/button/beep-07.wav"
-                response = requests.get(audio_url)
-                audio_bytes = BytesIO(response.content)
-                st.audio(audio_bytes, format='audio/wav')
-                st.session_state['bip_played'] = True
-            except Exception as e:
-                st.error(f"Erreur audio : {e}")
-
-    else:
-        st.markdown(f"""
-            <div class="box">
-                <div class="info">
-                    📍 Position détectée<br><br>
-                    🔕 Aucun signal détecté dans cette zone...
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        st.warning("🔕 Vous n'êtes à proximité d'aucun spot. Continuez d'explorer!")
-
-    # Affichage debug
-    with st.expander("Détails techniques"):
-        st.write(f"Latitude: {user_lat}")
-        st.write(f"Longitude: {user_lon}")
-        st.write(f"Spot le plus proche: {nom_zone}")
-        st.write(f"Distance: {int(distance_m)} mètres")
-
 else:
-    st.info("""
-    **Instructions:**
-    1. Activez la localisation sur votre téléphone ou navigateur
-    2. Approchez-vous d'un spot pour entendre le signal sonore
-    3. Le son est rejoué à chaque rafraîchissement si vous êtes dans une zone valide
-    """)
-
-# Liste admin des spots
-with st.expander("Voir tous les spots (Admin)"):
-    st.markdown("### Liste des spots à découvrir")
-    for i, spot in enumerate(points_cibles):
-        st.markdown(f'📌 <b>{spot["nom"]}</b>', unsafe_allow_html=True)
+    st.warning("📡 Position non détectée. Activez la localisation sur votre appareil pour la détection automatique.")
