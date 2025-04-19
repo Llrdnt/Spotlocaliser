@@ -10,9 +10,10 @@ CIBLE_RADIUS_METERS = 500
 
 # ZONES CIBLES GPS
 points_cibles = [
-    {"nom": "Caverne du castor ⛰️", "coords": (50.68704115862972, 4.260554416777018)},
-    {"nom": "Cabane de la meute 🛖", "coords": (50.68141372627077, 4.264321702154752)},
-    {"nom": "Tente de la troupe 🏕️", "coords": (50.68280545646507, 4.269052508141664)},
+    {"nom": "Caverne du castor ⛰️", "coords": (50.686760, 4.260713)},
+    {"nom": "Cabane de la meute 🛖", "coords": (50.681436, 4.264436)},
+    {"nom": "Tente de la troupe 🏕️", "coords": (50.682358, 4.266773)},
+    {"nom": "Base de vie - EBB", "coords": (50.681244, 4.264599)},
 ]
 
 # STYLES
