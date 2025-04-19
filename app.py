@@ -10,9 +10,9 @@ CIBLE_RADIUS_METERS = 500
 
 # ZONES CIBLES GPS
 points_cibles = [
-    {"nom": "Bonus 1", "coords": (50.68704115862972, 4.260554416777018)},
-    {"nom": "Bonus 2", "coords": (50.68141372627077, 4.264321702154752)},
-    {"nom": "Bonus 3", "coords": (50.68280545646507, 4.269052508141664)},
+    {"nom": "Caverne du castor ⛰️", "coords": (50.68704115862972, 4.260554416777018)},
+    {"nom": "Cabane de la meute 🛖", "coords": (50.68141372627077, 4.264321702154752)},
+    {"nom": "Tente de la troupe 🏕️", "coords": (50.68280545646507, 4.269052508141664)},
 ]
 
 # STYLES
@@ -58,7 +58,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="title">📍 Répertoire des Spots</div>', unsafe_allow_html=True)
+st.markdown('<div class="title">Détecteurs des caches secrètes 🧌</div>', unsafe_allow_html=True)
 
 # Initialiser la session state
 if 'position' not in st.session_state:
@@ -81,12 +81,12 @@ if st.session_state.position:
     user_loc = st.session_state.position
     st.markdown(f"""
         <div class=\"box\">
-            ✅ Position actuelle détectée<br>
+            📍 Position actuelle détectée<br>
             <b>Latitude:</b> {user_loc[0]:.6f}, <b>Longitude:</b> {user_loc[1]:.6f}
         </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<h3 style='margin-top:2em; color: #1b4332;'>🗺️ Distances jusqu'aux spots :</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='margin-top:2em; color: #1b4332;'>🗺️ Votre distance par rapport aux caches</h3>", unsafe_allow_html=True)
 
     for spot in points_cibles:
         distance = geodesic(user_loc, spot["coords"]).meters
@@ -98,3 +98,10 @@ if st.session_state.position:
         """, unsafe_allow_html=True)
 else:
     st.warning("📡 Position non détectée. Activez la localisation sur votre appareil pour la détection automatique.")
+
+
+st.markdown("""
+    <div style='margin-top: 3em; text-align: center;'>
+        <img src='https://github.com/Llrdnt/Spotlocaliser/blob/main/BRENCHATOBIS.png?raw=true' style='max-width: 60%; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);' alt='Image décorative'>
+    </div>
+""", unsafe_allow_html=True)
